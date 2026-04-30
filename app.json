@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "JDR Ambiances",
+    "slug": "jdr-ambiances",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "scheme": "jdrambiances",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.jdrambiances.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#120f16"
+      }
+    },
+    "plugins": [
+      "expo-web-browser"
+    ]
+  }
+}
