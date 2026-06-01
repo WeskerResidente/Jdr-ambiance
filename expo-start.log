@@ -1,0 +1,6 @@
+env: load .env
+env: export EXPO_PUBLIC_SPOTIFY_CLIENT_ID
+Starting project at Z:\symfony\Jdr
+Starting Metro Bundler
+Waiting on http://localhost:8082
+Logs for your project will appear below.

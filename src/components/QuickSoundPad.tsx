@@ -7,40 +7,44 @@ import { colors } from "../theme/colors";
 type Props = {
   effect: QuickEffect;
   hasAudio: boolean;
-  externalLabel?: string;
+  columns?: number;
+  large?: boolean;
+  readOnly?: boolean;
   onPlay: () => void;
   onImport: () => void;
-  onAttachExternalLink: () => void;
 };
 
-export function QuickSoundPad({ effect, hasAudio, externalLabel, onPlay, onImport, onAttachExternalLink }: Props) {
-  const canLaunch = hasAudio || Boolean(externalLabel);
+export function QuickSoundPad({ effect, hasAudio, columns = 4, large, readOnly, onPlay, onImport }: Props) {
+  const sourceLabel = hasAudio ? "Local" : "Vide";
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, { width: `${100 / columns}%` }]}>
       <Pressable
         accessibilityRole="button"
-        disabled={!canLaunch}
+        disabled={!hasAudio}
         onPress={onPlay}
         onLongPress={onImport}
         style={({ pressed }) => [
           styles.pad,
+          large && styles.largePad,
           { borderColor: `${effect.accent}99` },
-          !canLaunch && styles.disabled,
-          pressed && canLaunch && styles.pressed
+          !hasAudio && styles.disabled,
+          pressed && hasAudio && styles.pressed
         ]}
       >
-        <FontAwesome5 name={externalLabel && !hasAudio ? "external-link-alt" : (effect.icon as never)} size={18} color={effect.accent} />
+        <FontAwesome5 name={effect.icon as never} size={18} color={effect.accent} />
         <Text numberOfLines={2} adjustsFontSizeToFit style={styles.title}>
           {effect.title}
         </Text>
+        <Text style={[styles.sourceBadge, hasAudio && styles.sourceLocal]}>
+          {sourceLabel}
+        </Text>
       </Pressable>
-      <Pressable accessibilityRole="button" onPress={onImport} style={styles.importButton}>
-        <Text style={styles.importText}>{hasAudio ? "Changer" : "Ajouter"}</Text>
-      </Pressable>
-      <Pressable accessibilityRole="button" onPress={onAttachExternalLink} style={styles.importButton}>
-        <Text style={styles.importText}>{externalLabel ? "Lien" : "Web"}</Text>
-      </Pressable>
+      {!readOnly ? (
+        <Pressable accessibilityRole="button" onPress={onImport} style={styles.importButton}>
+          <Text style={styles.importText}>{hasAudio ? "Changer" : "Ajouter"}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -60,6 +64,9 @@ const styles = StyleSheet.create({
     padding: 8,
     gap: 8
   },
+  largePad: {
+    height: 108
+  },
   disabled: {
     opacity: 0.52
   },
@@ -68,12 +75,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceSoft
   },
   title: {
-    minHeight: 30,
+    minHeight: 22,
     color: colors.text,
     fontSize: 11,
     fontWeight: "700",
     textAlign: "center",
     letterSpacing: 0
+  },
+  sourceBadge: {
+    color: colors.muted,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0
+  },
+  sourceLocal: {
+    color: colors.gold
   },
   importButton: {
     minHeight: 28,

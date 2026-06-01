@@ -43,6 +43,12 @@ export async function getSpotifyDevices(accessToken: string): Promise<SpotifyDev
   return body.devices.filter((device) => device.id && !device.is_restricted);
 }
 
+export async function getSpotifyPlayback(accessToken: string): Promise<{ is_playing: boolean; device?: SpotifyDevice } | null> {
+  const response = await spotifyRequest(accessToken, "/me/player");
+  if (response.status === 204) return null;
+  return (await response.json()) as { is_playing: boolean; device?: SpotifyDevice };
+}
+
 export async function transferSpotifyPlayback(accessToken: string, deviceId: string, play = false) {
   await spotifyRequest(accessToken, "/me/player", {
     method: "PUT",
@@ -60,6 +66,54 @@ export async function pauseSpotifyPlayback(accessToken: string, deviceId?: strin
   });
 }
 
+export async function pauseSpotifyPlaybackEverywhere(accessToken: string, deviceIds: string[]) {
+  const uniqueDeviceIds = Array.from(new Set(deviceIds.filter(Boolean)));
+  const attempts = [() => pauseSpotifyPlayback(accessToken), ...uniqueDeviceIds.map((deviceId) => () => pauseSpotifyPlayback(accessToken, deviceId))];
+  let lastError: unknown;
+
+  for (const attempt of attempts) {
+    try {
+      await attempt();
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}
+
+export async function forceStopSpotifyPlayback(accessToken: string, preferredDeviceIds: string[] = []) {
+  const deviceIds = new Set(preferredDeviceIds.filter(Boolean));
+
+  try {
+    const playback = await getSpotifyPlayback(accessToken);
+    if (playback?.device?.id && !playback.device.is_restricted) {
+      deviceIds.add(playback.device.id);
+    }
+  } catch {
+    // The plain pause and device fallback below can still succeed.
+  }
+
+  try {
+    const devices = await getSpotifyDevices(accessToken);
+    devices.forEach((device) => {
+      if (device.id) deviceIds.add(device.id);
+    });
+  } catch {
+    // Device listing is optional for the stop command.
+  }
+
+  await pauseSpotifyPlaybackEverywhere(accessToken, Array.from(deviceIds));
+
+  await Promise.allSettled(
+    Array.from(deviceIds).map(async (deviceId) => {
+      await transferSpotifyPlayback(accessToken, deviceId, false);
+      await pauseSpotifyPlayback(accessToken, deviceId);
+    })
+  );
+}
+
 export async function startSpotifyPlayback(accessToken: string, spotifyUri: string, deviceId?: string) {
   const body = spotifyUri.startsWith("spotify:track:")
     ? { uris: [spotifyUri] }
@@ -69,16 +123,6 @@ export async function startSpotifyPlayback(accessToken: string, spotifyUri: stri
   await spotifyRequest(accessToken, target, {
     method: "PUT",
     body: JSON.stringify(body)
-  });
-}
-
-export async function setSpotifyVolume(accessToken: string, volume: number, deviceId?: string) {
-  const volumePercent = Math.round(Math.max(0, Math.min(1, volume)) * 100);
-  const target = deviceId
-    ? `/me/player/volume?volume_percent=${volumePercent}&device_id=${encodeURIComponent(deviceId)}`
-    : `/me/player/volume?volume_percent=${volumePercent}`;
-  await spotifyRequest(accessToken, target, {
-    method: "PUT"
   });
 }
 

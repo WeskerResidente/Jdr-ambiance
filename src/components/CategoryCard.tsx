@@ -1,6 +1,6 @@
 import { FontAwesome5 } from "@expo/vector-icons";
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { AmbientCategory } from "../types/audio";
 import { colors } from "../theme/colors";
 import { AppButton } from "./AppButton";
@@ -11,10 +11,17 @@ type Props = {
   externalLabel?: string;
   isPlaying: boolean;
   favorite: boolean;
+  readOnly?: boolean;
+  allowSourceReplacement?: boolean;
+  singleAddAction?: boolean;
   onTogglePlay: () => void;
   onImport: () => void;
   onAttachExternalLink: () => void;
+  onDeleteAudio?: () => void;
+  onDeleteExternalLink?: () => void;
   onToggleFavorite: () => void;
+  onOpenDetails?: () => void;
+  style?: ViewStyle;
 };
 
 export function CategoryCard({
@@ -23,25 +30,35 @@ export function CategoryCard({
   externalLabel,
   isPlaying,
   favorite,
+  readOnly,
+  allowSourceReplacement = true,
+  singleAddAction,
   onTogglePlay,
   onImport,
   onAttachExternalLink,
-  onToggleFavorite
+  onDeleteAudio,
+  onDeleteExternalLink,
+  onToggleFavorite,
+  onOpenDetails,
+  style
 }: Props) {
   const canLaunch = hasAudio || Boolean(externalLabel);
+  const canAddSource = allowSourceReplacement || !canLaunch;
 
   return (
-    <View style={[styles.card, { borderColor: `${category.accent}88` }]}>
+    <View style={[styles.card, { borderColor: `${category.accent}88` }, style]}>
       <View style={styles.header}>
-        <View style={[styles.iconWrap, { backgroundColor: `${category.accent}22` }]}>
-          <FontAwesome5 name={category.icon as never} size={18} color={category.accent} />
-        </View>
-        <View style={styles.titleBlock}>
-          <Text style={styles.title}>{category.title}</Text>
-          <Text numberOfLines={2} style={styles.description}>
-            {category.description}
-          </Text>
-        </View>
+        <Pressable accessibilityRole="button" onPress={onOpenDetails} disabled={!onOpenDetails} style={styles.detailsTarget}>
+          <View style={[styles.iconWrap, { backgroundColor: `${category.accent}22` }]}>
+            <FontAwesome5 name={category.icon as never} size={18} color={category.accent} />
+          </View>
+          <View style={styles.titleBlock}>
+            <Text style={styles.title}>{category.title}</Text>
+            <Text numberOfLines={2} style={styles.description}>
+              {category.description}
+            </Text>
+          </View>
+        </Pressable>
         <Pressable accessibilityRole="button" onPress={onToggleFavorite} style={styles.favorite}>
           <FontAwesome5 name="star" solid={favorite} size={17} color={favorite ? colors.gold : colors.muted} />
         </Pressable>
@@ -49,15 +66,28 @@ export function CategoryCard({
       <View style={styles.actions}>
         <AppButton
           compact
-          icon={externalLabel && !hasAudio ? "external-link-alt" : isPlaying ? "pause" : "play"}
+          icon={externalLabel && !hasAudio ? undefined : isPlaying ? "pause" : "play"}
           label={externalLabel && !hasAudio ? externalLabel : isPlaying ? "Pause" : "Lancer"}
           tone={canLaunch ? "primary" : "secondary"}
           disabled={!canLaunch}
           onPress={onTogglePlay}
           style={styles.actionButton}
         />
-        <AppButton compact icon="file-audio" label={hasAudio ? "Remplacer" : "Associer"} onPress={onImport} style={styles.actionButton} />
-        <AppButton compact icon="link" label={externalLabel ? "Changer lien" : "Lien web"} onPress={onAttachExternalLink} style={styles.actionButton} />
+        {!readOnly && canAddSource && singleAddAction ? (
+          <AppButton compact icon="plus" label="Ajouter un son" onPress={onImport} style={styles.actionButton} />
+        ) : null}
+        {!readOnly && canAddSource && !singleAddAction ? (
+          <AppButton compact label={hasAudio ? "Remplacer" : "Associer"} onPress={onImport} style={styles.actionButton} />
+        ) : null}
+        {!readOnly && canAddSource && !singleAddAction ? (
+          <AppButton compact label={externalLabel ? "Changer lien" : "Lien web"} onPress={onAttachExternalLink} style={styles.actionButton} />
+        ) : null}
+        {!readOnly && !allowSourceReplacement && hasAudio && onDeleteAudio ? (
+          <AppButton compact icon="trash" label="Supprimer son" tone="danger" onPress={onDeleteAudio} style={styles.actionButton} />
+        ) : null}
+        {!readOnly && !allowSourceReplacement && externalLabel && onDeleteExternalLink ? (
+          <AppButton compact icon="unlink" label="Supprimer lien" tone="danger" onPress={onDeleteExternalLink} style={styles.actionButton} />
+        ) : null}
       </View>
     </View>
   );
@@ -79,6 +109,12 @@ const styles = StyleSheet.create({
     elevation: 3
   },
   header: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10
+  },
+  detailsTarget: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10
@@ -117,6 +153,8 @@ const styles = StyleSheet.create({
     gap: 8
   },
   actionButton: {
-    width: "100%"
+    width: "100%",
+    minHeight: 44,
+    paddingHorizontal: 8
   }
 });

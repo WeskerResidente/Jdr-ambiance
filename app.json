@@ -3,23 +3,40 @@
     "name": "JDR Ambiances",
     "slug": "jdr-ambiances",
     "version": "1.0.0",
+    "icon": "./assets/icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "scheme": "jdrambiances",
     "assetBundlePatterns": [
       "**/*"
     ],
+    "runtimeVersion": "1.0.0",
+    "updates": {
+      "enabled": false
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.jdrambiances.app",
+      "build": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.jdrambiances.app",
+      "buildNumber": 1,
       "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#120f16"
       }
     },
     "plugins": [
       "expo-web-browser"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ad0a222e-98a8-479b-ab48-87f3b28dbd4a"
+      }
+    }
   }
 }

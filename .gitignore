@@ -1,0 +1,7 @@
+node_modules/
+.expo/
+.expo-test-export/
+.env
+dist/
+*.apk
+backend/data/

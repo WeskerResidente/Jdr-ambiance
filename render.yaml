@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: jdr-ambiances-api
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm run backend:mongo:start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.14.0
+      - key: MONGODB_DB
+        value: jdr_ambiances
+      - key: MONGODB_URI
+        sync: false
