@@ -1,6 +1,7 @@
+import "dotenv/config";
 import { createServer } from "node:http";
 import { pbkdf2Sync, randomBytes, randomUUID, timingSafeEqual, createHash } from "node:crypto";
-import { MongoClient } from "mongodb";
+import { MongoClient, ServerApiVersion } from "mongodb";
 
 const PORT = Number(process.env.PORT ?? process.env.JDR_API_PORT ?? 8000);
 const MONGO_URI = process.env.MONGODB_URI ?? process.env.JDR_MONGODB_URI;
@@ -15,8 +16,28 @@ if (!MONGO_URI) {
   process.exit(1);
 }
 
-const client = new MongoClient(MONGO_URI);
-await client.connect();
+const client = new MongoClient(MONGO_URI, {
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: false,
+    deprecationErrors: true
+  },
+  tls: true,
+  serverSelectionTimeoutMS: 15000
+});
+
+try {
+  await client.connect();
+  await client.db("admin").command({ ping: 1 });
+} catch (error) {
+  console.error("Connexion MongoDB Atlas impossible.");
+  console.error("Verifie dans MongoDB Atlas > Network Access que l'acces est autorise pour Render.");
+  console.error("Pour tester vite, ajoute temporairement 0.0.0.0/0 dans Network Access.");
+  console.error("Verifie aussi que MONGODB_URI est colle sans guillemets et avec le bon mot de passe encode.");
+  console.error(error);
+  process.exit(1);
+}
+
 const db = client.db(DB_NAME);
 
 const collections = {
