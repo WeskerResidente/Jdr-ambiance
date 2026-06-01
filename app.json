@@ -25,6 +25,7 @@
     "android": {
       "package": "com.jdrambiances.app",
       "buildNumber": 1,
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#120f16"

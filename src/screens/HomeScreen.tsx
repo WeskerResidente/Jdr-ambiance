@@ -69,7 +69,10 @@ const spotifyDiscovery = {
 };
 const spotifyScopes = ["user-read-private", "user-read-playback-state", "user-modify-playback-state"];
 // En développement avec Expo Go, utiliser le format exp://. Pour les builds natives, utiliser jdrambiances://
-const spotifyRedirectUri = Linking.createURL("spotify-auth");
+const spotifyRedirectUri =
+  Platform.OS === "web" && typeof window !== "undefined"
+    ? `${window.location.origin}/spotify-auth`
+    : "jdrambiances://spotify-auth";
 const iconChoices = [
   "hat-wizard",
   "dragon",
@@ -2340,60 +2343,65 @@ export function HomeScreen() {
       </Modal>
 
       <Modal visible={authModalVisible} animationType="slide" transparent onRequestClose={() => setAuthModalVisible(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, modalSafeAreaStyle]}>
-            <Text style={styles.modalTitle}>{authMode === "signup" ? "Creer un compte" : "Connexion"}</Text>
-            <Text style={styles.modalHint}>
-              {pendingPremiumActivation
-                ? "Connecte-toi pour rattacher le Premium a ton compte."
-                : "Connecte-toi pour preparer le futur espace utilisateur."}
-            </Text>
-            <TextInput
-              value={authEmail}
-              onChangeText={setAuthEmail}
-              placeholder="email@exemple.com"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              style={styles.input}
-            />
-            <TextInput
-              value={authPassword}
-              onChangeText={setAuthPassword}
-              placeholder="Mot de passe"
-              placeholderTextColor={colors.muted}
-              secureTextEntry
-              style={styles.input}
-            />
-            <View style={styles.authSwitch}>
-              <AppButton
-                compact
-                label={authMode === "signup" ? "J'ai deja un compte" : "Creer un compte"}
-                icon={authMode === "signup" ? "sign-in-alt" : "user-plus"}
-                disabled={authLoading}
-                onPress={() => setAuthMode(authMode === "signup" ? "login" : "signup")}
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, styles.keyboardModalCard, modalSafeAreaStyle]}>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalScroll}>
+              <Text style={styles.modalTitle}>{authMode === "signup" ? "Creer un compte" : "Connexion"}</Text>
+              <Text style={styles.modalHint}>
+                {pendingPremiumActivation
+                  ? "Connecte-toi pour rattacher le Premium a ton compte."
+                  : "Connecte-toi pour preparer le futur espace utilisateur."}
+              </Text>
+              <TextInput
+                value={authEmail}
+                onChangeText={setAuthEmail}
+                placeholder="email@exemple.com"
+                placeholderTextColor={colors.muted}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                returnKeyType="next"
+                style={styles.input}
               />
-            </View>
-            <View style={styles.modalActions}>
-              <AppButton
-                label="Annuler"
-                disabled={authLoading}
-                onPress={() => {
-                  setAuthModalVisible(false);
-                  setPendingPremiumActivation(false);
-                  setPendingPremiumFolderOpen(false);
-                }}
-                style={styles.modalButton}
+              <TextInput
+                value={authPassword}
+                onChangeText={setAuthPassword}
+                placeholder="Mot de passe"
+                placeholderTextColor={colors.muted}
+                secureTextEntry
+                returnKeyType="done"
+                onSubmitEditing={submitAuth}
+                style={styles.input}
               />
-              <AppButton
-                label={authLoading ? "Chargement..." : authMode === "signup" ? "Creer" : "Se connecter"}
-                icon={authMode === "signup" ? "user-plus" : "sign-in-alt"}
-                tone="primary"
-                disabled={authLoading}
-                onPress={submitAuth}
-                style={styles.modalButton}
-              />
-            </View>
+              <View style={styles.authSwitch}>
+                <AppButton
+                  compact
+                  label={authMode === "signup" ? "J'ai deja un compte" : "Creer un compte"}
+                  icon={authMode === "signup" ? "sign-in-alt" : "user-plus"}
+                  disabled={authLoading}
+                  onPress={() => setAuthMode(authMode === "signup" ? "login" : "signup")}
+                />
+              </View>
+              <View style={styles.modalActions}>
+                <AppButton
+                  label="Annuler"
+                  disabled={authLoading}
+                  onPress={() => {
+                    setAuthModalVisible(false);
+                    setPendingPremiumActivation(false);
+                    setPendingPremiumFolderOpen(false);
+                  }}
+                  style={styles.modalButton}
+                />
+                <AppButton
+                  label={authLoading ? "Chargement..." : authMode === "signup" ? "Creer" : "Se connecter"}
+                  icon={authMode === "signup" ? "user-plus" : "sign-in-alt"}
+                  tone="primary"
+                  disabled={authLoading}
+                  onPress={submitAuth}
+                  style={styles.modalButton}
+                />
+              </View>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -3314,6 +3322,9 @@ const styles = StyleSheet.create({
   },
   tallModalCard: {
     maxHeight: "88%"
+  },
+  keyboardModalCard: {
+    maxHeight: "82%"
   },
   modalScroll: {
     gap: 12,
