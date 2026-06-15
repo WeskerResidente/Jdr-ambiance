@@ -5,6 +5,7 @@ import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
 import {
   Alert,
+  AppState,
   BackHandler,
   Image,
   KeyboardAvoidingView,
@@ -72,7 +73,16 @@ const spotifyScopes = ["user-read-private", "user-read-playback-state", "user-mo
 const spotifyRedirectUri =
   Platform.OS === "web" && typeof window !== "undefined"
     ? `${window.location.origin}/spotify-auth`
-    : "jdrambiances://spotify-auth";
+    : AuthSession.makeRedirectUri({
+        scheme: "jdrambiances",
+        path: "spotify-auth",
+        native: "jdrambiances://spotify-auth"
+      });
+const configuredSpotifyClientId = SPOTIFY_CLIENT_ID.trim() || "bc0f0143a58c46e5842f8f65ae707334";
+const isLikelyIosWeb =
+  Platform.OS === "web" &&
+  typeof navigator !== "undefined" &&
+  /iPad|iPhone|iPod/.test(navigator.userAgent);
 const iconChoices = [
   "hat-wizard",
   "dragon",
@@ -153,7 +163,7 @@ export function HomeScreen() {
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [favoriteCategoriesByFolder, setFavoriteCategoriesByFolder] = useState<Record<string, string[]>>({});
   const [activeLoopIds, setActiveLoopIds] = useState<string[]>([]);
-  const [spotifyClientId, setSpotifyClientId] = useState(SPOTIFY_CLIENT_ID);
+  const [spotifyClientId, setSpotifyClientId] = useState(configuredSpotifyClientId);
   const [spotifyTokens, setSpotifyTokens] = useState<SpotifyTokens | null>(null);
   const [spotifyProfileName, setSpotifyProfileName] = useState("");
   const [spotifyDevices, setSpotifyDevices] = useState<SpotifyDevice[]>([]);
@@ -205,7 +215,7 @@ export function HomeScreen() {
   const localUserRef = useRef<LocalUser | null>(null);
   const [spotifyRequest, spotifyResponse, promptSpotifyAsync] = AuthSession.useAuthRequest(
     {
-      clientId: spotifyClientId.trim() || "missing-client-id",
+      clientId: spotifyClientId.trim() || configuredSpotifyClientId,
       redirectUri: spotifyRedirectUri,
       responseType: AuthSession.ResponseType.Code,
       scopes: spotifyScopes,
@@ -260,7 +270,7 @@ export function HomeScreen() {
       setExternalLinks(currentUser ? storedExternalLinks : []);
       setScenes(currentUser ? storedScenes : []);
       setFavoriteCategoriesByFolder(currentUser ? storedFavoriteCategoriesByFolder : {});
-      setSpotifyClientId(SPOTIFY_CLIENT_ID || storedSpotifyClientId);
+      setSpotifyClientId(configuredSpotifyClientId || storedSpotifyClientId);
       setSpotifyTokens(storedSpotifyTokens);
       setSelectedSpotifyDeviceId(storedSpotifyDeviceId);
       const restoredTier = currentUser ? storedSubscriptionTier : "free";
@@ -357,6 +367,32 @@ export function HomeScreen() {
     }
 
     loadSpotifyProfile();
+  }, [spotifyTokens]);
+
+  useEffect(() => {
+    if (!spotifyTokens?.accessToken || !isSpotifyTokenFresh(spotifyTokens)) return;
+
+    if (Platform.OS === "web") {
+      const refreshOnReturn = () => {
+        void refreshSpotifyDevices(spotifyTokens);
+      };
+      const refreshOnVisibility = () => {
+        if (typeof document !== "undefined" && document.visibilityState === "visible") refreshOnReturn();
+      };
+
+      window.addEventListener("focus", refreshOnReturn);
+      document.addEventListener("visibilitychange", refreshOnVisibility);
+      return () => {
+        window.removeEventListener("focus", refreshOnReturn);
+        document.removeEventListener("visibilitychange", refreshOnVisibility);
+      };
+    }
+
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void refreshSpotifyDevices(spotifyTokens);
+    });
+
+    return () => subscription.remove();
   }, [spotifyTokens]);
 
   useEffect(() => {
@@ -1317,6 +1353,24 @@ export function HomeScreen() {
     }
   }
 
+  async function openSpotifyApp() {
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      window.location.href = "spotify://";
+      window.setTimeout(() => {
+        window.location.href = "https://open.spotify.com";
+      }, 1200);
+      return;
+    }
+
+    try {
+      const spotifyScheme = "spotify://";
+      const canOpenSpotify = await Linking.canOpenURL(spotifyScheme);
+      await Linking.openURL(canOpenSpotify ? spotifyScheme : "https://open.spotify.com");
+    } catch {
+      await Linking.openURL("https://open.spotify.com");
+    }
+  }
+
   async function selectSpotifyDevice(deviceId: string) {
     setSelectedSpotifyDeviceId(deviceId);
     await storageService.saveSpotifyDeviceId(deviceId);
@@ -1342,7 +1396,7 @@ export function HomeScreen() {
       return;
     }
 
-    if (!SPOTIFY_CLIENT_ID) {
+    if (!configuredSpotifyClientId) {
       await storageService.saveSpotifyClientId(cleanClientId);
     }
     // Afficher l'URI exact généré pour la configuration Spotify
@@ -1360,14 +1414,26 @@ export function HomeScreen() {
   }
 
   async function connectSpotify() {
-    if (!spotifyClientId.trim()) {
+    const activeSpotifyClientId = spotifyClientId.trim() || configuredSpotifyClientId;
+
+    if (!activeSpotifyClientId) {
       Alert.alert("Configuration requise", "Le développeur doit renseigner le Client ID Spotify dans src/config/spotify.ts.");
       return;
     }
 
-    if (!SPOTIFY_CLIENT_ID) {
-      await storageService.saveSpotifyClientId(spotifyClientId.trim());
+    if (!spotifyClientId.trim()) {
+      setSpotifyClientId(activeSpotifyClientId);
     }
+
+    if (!configuredSpotifyClientId) {
+      await storageService.saveSpotifyClientId(activeSpotifyClientId);
+    }
+
+    if (!spotifyRequest) {
+      Alert.alert("Spotify se prepare", `Reessaie dans quelques secondes.\n\nRedirect URI actuel :\n${spotifyRedirectUri}`);
+      return;
+    }
+
     await promptSpotifyAsync();
   }
 
@@ -1885,7 +1951,7 @@ export function HomeScreen() {
                 <Text style={styles.spotifyHint}>
                   {spotifyTokens
                     ? spotifyProfileName || "Spotify est pret pour les liens externes."
-                    : SPOTIFY_CLIENT_ID
+                    : spotifyClientId.trim() || configuredSpotifyClientId
                       ? "Connecte Spotify pour lancer les playlists, albums et titres."
                       : "Client ID Spotify manquant dans la configuration développeur."}
                 </Text>
@@ -1893,7 +1959,7 @@ export function HomeScreen() {
               {spotifyTokens ? (
                 <AppButton compact icon="sign-out-alt" label="Déconnecter" tone="danger" onPress={disconnectSpotify} />
               ) : (
-                <AppButton compact icon="spotify" label="Connecter" tone="primary" disabled={!spotifyClientId.trim() || !spotifyRequest} onPress={connectSpotify} />
+                <AppButton compact icon="spotify" label="Connecter" tone="primary" disabled={!(spotifyClientId.trim() || configuredSpotifyClientId)} onPress={connectSpotify} />
               )}
             </View>
             {spotifyTokens ? (
@@ -1909,9 +1975,14 @@ export function HomeScreen() {
                   />
                 </View>
                 {spotifyDevices.length === 0 ? (
-                  <Text style={styles.spotifyHint}>
-                    Aucun appareil Spotify détecté. Lance Spotify sur ton téléphone, ordinateur ou enceinte connectée, puis rafraîchis.
-                  </Text>
+                  <View style={styles.spotifyEmptyDevices}>
+                    <Text style={styles.spotifyHint}>
+                      {Platform.OS === "ios" || isLikelyIosWeb
+                        ? "Sur iPhone, ouvre Spotify, lance ou pause une musique une fois, puis reviens ici. Le rafraichissement se relancera automatiquement."
+                        : "Aucun appareil Spotify detecte. Lance Spotify sur ton telephone, ordinateur ou enceinte connectee, puis rafraichis."}
+                    </Text>
+                    <AppButton compact icon="spotify" label="Ouvrir Spotify" onPress={openSpotifyApp} />
+                  </View>
                 ) : (
                   <View style={styles.deviceList}>
                     {spotifyDevices.map((device) => {
@@ -2862,6 +2933,10 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: "900",
     letterSpacing: 0
+  },
+  spotifyEmptyDevices: {
+    gap: 10,
+    alignItems: "flex-start"
   },
   deviceList: {
     gap: 8
